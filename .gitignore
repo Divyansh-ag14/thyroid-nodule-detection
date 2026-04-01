@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+mac_env/
+
+# Logs and local runtime output
+logs/*.log
+
+# Local model artifacts
+model artifacts/
+my_model.txt
+_personal/
+NOTES/
