@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThyroCheck AI | Thyroid Ultrasound Review</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="app-shell">
+        <header class="app-topbar animate-in">
+            <div class="brand">
+                <div class="brand-mark">TC</div>
+                <div class="brand-copy">
+                    <p class="eyebrow">Clinical Review Suite</p>
+                    <h1>ThyroCheck AI</h1>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <button class="secondary-button" data-action="new-case" type="button">New case</button>
+                <button class="primary-button" data-action="report" type="button">Download report</button>
+            </div>
+        </header>
+
+        <main class="app-frame">
+            <section class="case-banner animate-in animate-delay-1">
+                <div class="case-banner-main">
+                    <div class="case-banner-head">
+                        <div>
+                            <p class="eyebrow">Case Workspace</p>
+                            <h3 id="heroLabel">No case loaded</h3>
+                        </div>
+                        <span class="status-tag neutral" id="analysisStatus">Awaiting upload</span>
+                    </div>
+
+                    <p class="case-banner-copy" id="clinicalSummary">
+                        Upload a thyroid ultrasound image to start the review workflow and populate the case summary.
+                    </p>
+                </div>
+
+                <div class="case-banner-side">
+                    <div class="case-metric-grid">
+                        <article class="banner-metric">
+                            <span>Confidence</span>
+                            <strong id="heroConfidence">0.00%</strong>
+                        </article>
+                        <article class="banner-metric">
+                            <span>Risk band</span>
+                            <strong id="riskBand">Not available</strong>
+                        </article>
+                        <article class="banner-metric">
+                            <span>Report</span>
+                            <strong id="reportSummary">Awaiting analysis</strong>
+                        </article>
+                        <article class="banner-metric">
+                            <span>Preview</span>
+                            <strong id="previewState">No active case</strong>
+                        </article>
+                    </div>
+
+                    <div class="case-banner-footer">
+                        <div class="confidence-track">
+                            <span id="confidenceMeter"></span>
+                        </div>
+                        <p id="confidenceLabel">Confidence guidance will appear after analysis is complete.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="workspace-shell animate-in animate-delay-2" id="workspace">
+                <section class="workspace-main">
+                    <div class="panel-header">
+                        <div>
+                            <p class="eyebrow">Case Intake</p>
+                            <h3>Upload image</h3>
+                            <p class="panel-copy">Start a new review by uploading one thyroid ultrasound still image.</p>
+                        </div>
+                    </div>
+
+                    <div class="intake-info">
+                        <article>
+                            <span>Input</span>
+                            <strong>Single ultrasound still</strong>
+                            <p>One PNG or JPEG image from the current case.</p>
+                        </article>
+                        <article>
+                            <span>Output</span>
+                            <strong>Interpretation package</strong>
+                            <p>Prediction, Grad-CAM attention, and a ready report draft.</p>
+                        </article>
+                        <article>
+                            <span>Use</span>
+                            <strong>Clinical review support</strong>
+                            <p>Designed to sit alongside imaging context and clinician judgment.</p>
+                        </article>
+                    </div>
+
+                    <label class="upload-stage" id="dropZone" for="fileInput">
+                        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/jpg">
+                        <div class="upload-stage-inner">
+                            <div class="upload-layout">
+                                <div class="upload-primary">
+                                    <div class="upload-mark">
+                                        <span></span>
+                                    </div>
+                                    <p class="upload-kicker">Step 1</p>
+                                    <h4>Drop ultrasound image</h4>
+                                    <p>Drag and drop a PNG or JPEG scan here, or browse from your device.</p>
+                                    <div class="upload-actions">
+                                        <span class="upload-button">Browse files</span>
+                                        <span class="upload-spec">PNG, JPG, JPEG</span>
+                                    </div>
+                                    <p class="upload-note">Single image upload. Analysis starts immediately after selection.</p>
+                                </div>
+
+                                <aside class="upload-secondary">
+                                    <p class="upload-kicker">Review path</p>
+                                    <h4>What this case will generate</h4>
+
+                                    <div class="upload-step">
+                                        <span>01</span>
+                                        <div>
+                                            <strong>Immediate model review</strong>
+                                            <p>Inference starts as soon as the image is selected.</p>
+                                        </div>
+                                    </div>
+                                    <div class="upload-step">
+                                        <span>02</span>
+                                        <div>
+                                            <strong>Visual attention overlay</strong>
+                                            <p>Compare the source image with Grad-CAM focus regions.</p>
+                                        </div>
+                                    </div>
+                                    <div class="upload-step">
+                                        <span>03</span>
+                                        <div>
+                                            <strong>Structured report preview</strong>
+                                            <p>Review findings, confidence, and guidance before export.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="upload-preview-card">
+                                        <span>Included in report</span>
+                                        <strong>Finding, confidence score, interpretation, and review guidance</strong>
+                                    </div>
+                                </aside>
+                            </div>
+                        </div>
+                    </label>
+
+                    <p class="upload-support" id="uploadSupport">Accepted input: PNG, JPG, JPEG. One image per case.</p>
+
+                    <div class="loader" id="loader" aria-hidden="true"></div>
+                </section>
+
+                <aside class="workspace-side is-hidden" id="previewPanel">
+                    <div class="panel-header">
+                        <div>
+                            <p class="eyebrow">Current Preview</p>
+                            <h3>Preview</h3>
+                        </div>
+                    </div>
+
+                    <div class="image-stage image-stage-hero" id="previewStage">
+                        <img id="heroPreview" alt="Selected scan preview">
+                        <div class="image-placeholder" id="previewEmpty">
+                            <strong>No active case</strong>
+                            <p>The uploaded scan will appear here before analysis begins.</p>
+                        </div>
+                    </div>
+
+                    <div class="workspace-side-meta">
+                        <div>
+                            <span>Status</span>
+                            <strong id="analysisStatusText">Awaiting upload</strong>
+                        </div>
+                        <div>
+                            <span>Workflow note</span>
+                            <strong id="opsNote">Upload a case to populate workflow guidance.</strong>
+                        </div>
+                    </div>
+                </aside>
+            </section>
+
+            <section class="review-shell is-hidden animate-in animate-delay-3" id="review">
+                <div class="review-header">
+                    <div>
+                        <p class="eyebrow">Diagnostic Review</p>
+                        <h3>Results</h3>
+                    </div>
+
+                    <div class="metric-ribbon">
+                        <article class="metric-item">
+                            <span>Predicted class</span>
+                            <strong id="predBadge" class="prediction-badge neutral">Awaiting analysis</strong>
+                        </article>
+                        <article class="metric-item">
+                            <span>Confidence</span>
+                            <strong id="confPercent">0.00%</strong>
+                        </article>
+                        <article class="metric-item">
+                            <span>Interpretation</span>
+                            <strong id="clinicalInterpretation">Awaiting inference</strong>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="review-grid">
+                    <article class="review-panel">
+                        <div class="panel-header">
+                            <div>
+                                <p class="eyebrow">Source Image</p>
+                                <h3>Original scan</h3>
+                            </div>
+                        </div>
+
+                        <div class="image-stage" id="originalStage">
+                            <img id="originalImg" alt="Original uploaded scan">
+                            <div class="image-placeholder" id="originalPlaceholder">
+                                <strong>No source image yet</strong>
+                                <p>The uploaded scan will appear here once a case is loaded.</p>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="review-panel">
+                        <div class="panel-header">
+                            <div>
+                                <p class="eyebrow">Explainability</p>
+                                <h3>Attention map</h3>
+                            </div>
+                        </div>
+
+                        <div class="image-stage" id="gradcamStage">
+                            <img id="gradcamImg" alt="Grad-CAM attention heatmap">
+                            <div class="image-placeholder" id="gradcamPlaceholder">
+                                <strong>No attention map yet</strong>
+                                <p>The Grad-CAM visualization will appear after analysis.</p>
+                            </div>
+                        </div>
+
+                        <p class="card-copy" id="gradcamSummary">
+                            Bright regions indicate the image areas that most influenced the final classification.
+                        </p>
+                    </article>
+
+                    <aside class="review-summary">
+                        <div class="panel-header">
+                            <div>
+                                <p class="eyebrow">Report Preview</p>
+                                <h3>Clinical summary</h3>
+                            </div>
+                        </div>
+
+                        <article class="report-preview">
+                            <div class="report-preview-row">
+                                <span>Finding</span>
+                                <strong id="reportPreviewFinding">Awaiting analysis</strong>
+                            </div>
+                            <div class="report-preview-row">
+                                <span>Confidence</span>
+                                <strong id="confidenceReadout">0.00%</strong>
+                            </div>
+                            <div class="report-preview-row">
+                                <span>Interpretation</span>
+                                <strong id="reportPreviewInterpretation">Awaiting inference</strong>
+                            </div>
+                            <div class="report-preview-row">
+                                <span>Guidance</span>
+                                <p id="analysisNote">Confidence commentary and review guidance will appear after analysis.</p>
+                            </div>
+                        </article>
+                    </aside>
+                </div>
+
+                <div class="review-footer">
+                    <button class="primary-button report-button" id="downloadBtn" type="button">Download case report</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="alert" id="customAlert"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
