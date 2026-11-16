@@ -1,84 +1,71 @@
 import tensorflow as tf
 import numpy as np
-import cv2
-import matplotlib.cm as cm
+import matplotlib
 from PIL import Image
 from utils.logger import logger
+from utils.model_architecture import GRADCAM_LAYER
 
-def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
+
+def find_target_layer(model):
+    """Last spatial feature layer: the named Grad-CAM target, else the last DWSC block (models saved before the named target existed)."""
+    names = [layer.name for layer in model.layers]
+    if GRADCAM_LAYER in names:
+        return GRADCAM_LAYER
+    return next((n for n in reversed(names) if "depthwise_separable_conv" in n), None)
+
+
+def make_gradcam_heatmap(img_array, model, last_conv_layer_name, explain_malignant=None):
     """
-    Generates a Grad-CAM heatmap for a given image and model.
+    Grad-CAM for a single-sigmoid binary classifier.
+
+    The previous version took `argmax` over the one-element sigmoid output, which is
+    always index 0, so every heatmap explained the malignant score regardless of the
+    prediction. Here we differentiate the logit: +logit explains "malignant",
+    -logit explains "benign". By default the predicted class is explained.
     """
-    # Create a model that maps the input image to the activations of the last conv layer
     try:
         grad_model = tf.keras.models.Model(
-            [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output]
+            model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
         )
     except Exception as e:
         logger.error(f"Error creating Grad-CAM model: {e}")
         return None
 
-    # Compute the gradient of the top predicted class for our input image
     with tf.GradientTape() as tape:
-        last_conv_layer_output, preds = grad_model(img_array)
-        
-        # Handle cases where preds might be wrapped in a list (e.g., if model output is a list)
+        conv_out, preds = grad_model(img_array, training=False)
         if isinstance(preds, list):
             preds = preds[0]
-            
-        if pred_index is None:
-            pred_index = tf.argmax(preds[0])
-        class_channel = preds[:, pred_index]
+        p = tf.clip_by_value(preds[:, 0], 1e-6, 1 - 1e-6)
+        logit = tf.math.log(p / (1 - p))
+        if explain_malignant is None:
+            explain_malignant = bool(p[0] >= 0.5)
+        target = logit if explain_malignant else -logit
 
-    # This is the gradient of the output neuron (top predicted or chosen)
-    grads = tape.gradient(class_channel, last_conv_layer_output)
+    grads = tape.gradient(target, conv_out)
+    weights = tf.reduce_mean(grads, axis=(0, 1, 2))
+    heatmap = tf.squeeze(conv_out[0] @ weights[..., tf.newaxis])
+    heatmap = tf.maximum(heatmap, 0)
+    peak = tf.reduce_max(heatmap)
+    if peak <= 0:
+        return np.zeros(heatmap.shape, dtype=np.float32)
+    return (heatmap / peak).numpy()
 
-    # This is a vector where each entry is the mean intensity of the gradient
-    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
-
-    # We multiply each channel in the feature map array
-    last_conv_layer_output = last_conv_layer_output[0]
-    heatmap = last_conv_layer_output @ pooled_grads[..., tf.newaxis]
-    heatmap = tf.squeeze(heatmap)
-
-    # For visualization purpose, we will also normalize the heatmap between 0 & 1
-    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
-    return heatmap.numpy()
 
 def save_and_display_gradcam(img, heatmap, alpha=0.4):
     """
-    Superimposes the heatmap on the original image.
-    img: PIL Image or numpy array (0-255)
-    heatmap: numpy array (normalized)
+    Superimposes the heatmap on an image.
+    img: PIL Image or uint8 numpy array; must be the same view the model saw
+         (the preprocessed 224x224 frame) so the overlay is spatially aligned.
     """
-    # Ensure img is a PIL Image and convert to RGB
     if not isinstance(img, Image.Image):
         img = Image.fromarray(img)
-    
-    # Always convert to RGB to ensure 3 channels
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-        
-    # Now convert to numpy array (H, W, 3)
-    img = np.array(img)
-    
-    # Rescale heatmap to a range 0-255
-    heatmap = np.uint8(255 * heatmap)
+    img = np.asarray(img.convert("RGB"), dtype=np.float32)
 
-    # Use jet colormap to colorize heatmap
-    jet = cm.get_cmap("jet")
-
-    # Use RGB values of the colormap
-    jet_colors = jet(np.arange(256))[:, :3]
-    jet_heatmap = jet_colors[heatmap]
-
-    # Create an image with RGB colorized heatmap
-    jet_heatmap = tf.keras.preprocessing.image.array_to_img(jet_heatmap)
-    jet_heatmap = jet_heatmap.resize((img.shape[1], img.shape[0]))
-    jet_heatmap = tf.keras.preprocessing.image.img_to_array(jet_heatmap)
-
-    # Superimpose the heatmap on original image
-    superimposed_img = jet_heatmap * alpha + img
-    superimposed_img = tf.keras.preprocessing.image.array_to_img(superimposed_img)
-
-    return superimposed_img
+    jet = matplotlib.colormaps["jet"](np.arange(256))[:, :3]
+    colored = jet[np.uint8(255 * heatmap)] * 255
+    colored = np.asarray(
+        Image.fromarray(colored.astype(np.uint8)).resize((img.shape[1], img.shape[0]), Image.BILINEAR),
+        dtype=np.float32,
+    )
+    blended = np.clip(colored * alpha + img * (1 - alpha), 0, 255).astype(np.uint8)
+    return Image.fromarray(blended)
