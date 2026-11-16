@@ -4,6 +4,12 @@ Thyroid nodule malignancy classification from B-mode ultrasound with **Fibonacci
 
 > Research prototype. Not a medical device and not for clinical decision-making.
 
+<p align="center">
+  <img src="docs/case-review.png" alt="Case review: risk band, calibrated probability, risk scale and Grad-CAM evidence map" width="49%">
+  <img src="docs/model-validation.png" alt="Model validation: FibonacciNet vs standard CNN accuracy and cost" width="49%">
+</p>
+<p align="center"><em>Left: case review on a held-out test image. Right: model validation page.</em></p>
+
 ## Results
 
 <p align="center"><img src="reports/figures/benchmark.png" alt="FibonacciNet vs standard CNN: AUROC and cost" width="900"></p>
