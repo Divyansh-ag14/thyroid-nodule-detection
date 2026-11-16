@@ -1,0 +1,29 @@
+{
+  "attribution": "TN5000 (Zhang et al., Scientific Data 2025), CC BY",
+  "samples": [
+    {
+      "file": "/static/samples/sample-1.jpg",
+      "title": "Sample 1",
+      "biopsy": "malignant",
+      "source_id": "004506.jpg"
+    },
+    {
+      "file": "/static/samples/sample-2.jpg",
+      "title": "Sample 2",
+      "biopsy": "benign",
+      "source_id": "003527.jpg"
+    },
+    {
+      "file": "/static/samples/sample-3.jpg",
+      "title": "Sample 3",
+      "biopsy": "benign",
+      "source_id": "002918.jpg"
+    },
+    {
+      "file": "/static/samples/sample-4.jpg",
+      "title": "Sample 4",
+      "biopsy": "malignant",
+      "source_id": "003657.jpg"
+    }
+  ]
+}
