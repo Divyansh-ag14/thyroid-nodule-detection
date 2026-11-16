@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThyroCheck AI | Model Validation</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/benchmark.css?v=9">
+</head>
+
+<body>
+    <div class="app-shell">
+        <header class="app-topbar">
+            <div class="brand">
+                <div class="brand-mark">TC</div>
+                <div class="brand-copy">
+                    <p class="eyebrow">Model Validation</p>
+                    <h1>How the model was tested</h1>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <a class="secondary-button" href="/">Back to case review</a>
+            </div>
+        </header>
+
+        <main class="bench" id="bench">
+            <section class="bench-card" id="benchLoading">
+                <p class="eyebrow">Model validation</p>
+                <h3>Loading results…</h3>
+                <p class="bench-muted" id="benchError"></p>
+            </section>
+
+            <!-- 1. Headline -->
+            <section class="hero is-hidden" id="hero">
+                <div class="hero-copy">
+                    <p class="eyebrow">FibonacciNet vs. a standard CNN</p>
+                    <h2 id="heroTitle"></h2>
+                    <p class="hero-lede" id="heroLede"></p>
+                    <p class="verdict" id="heroVerdict"></p>
+                </div>
+                <div class="ratio-grid" id="ratioGrid"></div>
+            </section>
+
+            <!-- 2. Head-to-head -->
+            <div class="pair-grid is-hidden" id="pairGrid">
+                <section class="bench-card">
+                    <p class="eyebrow">Accuracy</p>
+                    <h3>Practically identical</h3>
+                    <p class="card-sub" id="accuracySub"></p>
+                    <div class="legend" id="accuracyLegend"></div>
+                    <div class="bars" id="accuracyBars"></div>
+                </section>
+                <section class="bench-card">
+                    <p class="eyebrow">Cost</p>
+                    <h3>A fraction of the resources</h3>
+                    <p class="card-sub">Shorter is better. Bars are scaled to the standard CNN.</p>
+                    <div class="legend" id="costLegend"></div>
+                    <div class="bars" id="costBars"></div>
+                </section>
+            </div>
+
+            <!-- 3. Clinical meaning -->
+            <section class="bench-card is-hidden" id="triageCard">
+                <p class="eyebrow">What it means for a patient</p>
+                <h3>Three risk bands, set for safety</h3>
+                <p class="card-sub">Each FibonacciNet result falls into one of three bands. The cut-offs were fixed before testing,
+                    on separate validation images, so that cancers are rarely called low risk.</p>
+                <div class="triage" id="triage"></div>
+                <p class="bench-muted" id="triageNote"></p>
+            </section>
+
+            <!-- 4. Charts -->
+            <div class="pair-grid is-hidden" id="chartGrid">
+                <section class="bench-card">
+                    <div class="card-head">
+                        <div>
+                            <p class="eyebrow">Discrimination</p>
+                            <h3>Telling benign from malignant</h3>
+                        </div>
+                        <div class="segmented" role="tablist" id="rocToggle">
+                            <button type="button" role="tab" aria-selected="true" data-set="test">Main test set</button>
+                            <button type="button" role="tab" aria-selected="false" data-set="external">External</button>
+                        </div>
+                    </div>
+                    <p class="card-sub">The closer a curve hugs the top-left corner, the better. Curves show one representative training
+                        run of each model; the two overlap almost everywhere.</p>
+                    <div class="legend" id="rocLegend"></div>
+                    <div class="chart" id="rocChart"></div>
+                </section>
+                <section class="bench-card">
+                    <p class="eyebrow">Reliability</p>
+                    <h3>Probabilities you can take at face value</h3>
+                    <p class="card-sub" id="calSub"></p>
+                    <div class="chart" id="calChart"></div>
+                </section>
+            </div>
+
+            <!-- 5. Data and method -->
+            <div class="pair-grid is-hidden" id="aboutGrid">
+                <section class="bench-card">
+                    <p class="eyebrow">How it was tested</p>
+                    <h3>A fair, leak-free comparison</h3>
+                    <ul class="fact-list" id="methodList"></ul>
+                </section>
+                <section class="bench-card">
+                    <p class="eyebrow">Limitations</p>
+                    <h3>What these results do not show</h3>
+                    <ul class="fact-list">
+                        <li>The model assesses a nodule that is already in the image; it does not find nodules.</li>
+                        <li>Accuracy drops on images from a different source, and probabilities need re-calibrating for a new hospital's patient mix.</li>
+                        <li>Small nodules are missed more often than larger ones.</li>
+                        <li>Neither dataset has patient IDs, so separate images of the same patient cannot be fully ruled out.</li>
+                        <li>Research prototype: not a medical device and not for clinical decisions.</li>
+                    </ul>
+                </section>
+            </div>
+        </main>
+    </div>
+    <div class="chart-tooltip" id="tooltip" role="status"></div>
+    <script src="/static/benchmark.js?v=8"></script>
+</body>
+
+</html>
