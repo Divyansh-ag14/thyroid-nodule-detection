@@ -22,7 +22,8 @@ def set_cell_margins(cell, **kwargs):
             tcMar.append(node)
     tcPr.append(tcMar)
 
-def generate_docx_report(image_buffer, prediction_label, confidence_score, confidence_percent, gradcam_buffer=None):
+def generate_docx_report(image_buffer, prediction_label, confidence_score, confidence_percent, gradcam_buffer=None,
+                         risk_label=None, guidance=None, model_meta=None):
     """
     Generates a professional DOCX report for thyroid cancer detection.
     """
@@ -55,7 +56,8 @@ def generate_docx_report(image_buffer, prediction_label, confidence_score, confi
     doc.add_heading('1. Analysis Executive Summary', level=1)
     
     # Summary Table
-    table = doc.add_table(rows=4, cols=2)
+    model_meta = model_meta or {}
+    table = doc.add_table(rows=6, cols=2)
     table.style = 'Table Grid'
     
     def fill_row(row_idx, label, value, is_bold_val=False):
@@ -68,14 +70,27 @@ def generate_docx_report(image_buffer, prediction_label, confidence_score, confi
         set_cell_margins(row.cells[0], start=100)
         set_cell_margins(row.cells[1], start=100)
 
-    fill_row(0, "Diagnostic Determination", prediction_label.upper(), True)
-    fill_row(1, "Probability Coefficient", f"{confidence_score:.4f}")
-    fill_row(2, "Confidence Level", f"{confidence_percent:.2f}%")
-    fill_row(3, "Neural Network ID", "FibonacciNet-v1 (ResNet-DWSC)")
+    thr = model_meta.get("thresholds", {})
+    fill_row(0, "Model Output", prediction_label.upper(), True)
+    fill_row(1, "Risk Band", risk_label or "n/a", True)
+    fill_row(2, "Calibrated Malignancy Probability", f"{confidence_percent:.1f}%")
+    fill_row(3, "Operating Thresholds",
+             f"rule-out {thr.get('rule_out', 0.5):.2f}  |  rule-in {thr.get('rule_in', thr.get('balanced', 0.5)):.2f}")
+    fill_row(4, "Model", f"FibonacciNet ({model_meta.get('source', 'unknown source')})")
+    auc, ci = model_meta.get("test_auc"), model_meta.get("test_auc_ci")
+    fill_row(5, "Held-out Test AUROC", f"{auc:.3f} (95% CI {ci[0]:.3f}-{ci[1]:.3f})" if auc and ci else "n/a")
+
+    if guidance:
+        doc.add_paragraph()
+        p = doc.add_paragraph()
+        p.add_run("Suggested next step: ").bold = True
+        p.add_run(guidance)
 
     # Color the determination cell
-    if "Malignant" in prediction_label:
+    if "Suspicious" in prediction_label or "Malignant" in prediction_label:
         table.rows[0].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 82, 82)
+    elif "Indeterminate" in prediction_label:
+        table.rows[0].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(171, 122, 30)
     else:
         table.rows[0].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(0, 192, 163)
 
@@ -88,7 +103,7 @@ def generate_docx_report(image_buffer, prediction_label, confidence_score, confi
     # Since side-by-side can be tricky in docx without complex tables, we'll do structured stacking
     
     if image_buffer:
-        doc.add_heading('Primary Ultrasound / Pathology Scan', level=2)
+        doc.add_heading('Ultrasound Frame (as analysed by the model)', level=2)
         image_buffer.seek(0)
         doc.add_picture(image_buffer, width=Inches(4.5))
         last_para = doc.paragraphs[-1]
@@ -109,10 +124,13 @@ def generate_docx_report(image_buffer, prediction_label, confidence_score, confi
     doc.add_page_break()
     doc.add_heading('3. Technical Methodology', level=1)
     doc.add_paragraph(
-        "This diagnostic analysis was performed using ThyroCheck AI's proprietary FibonacciNet architecture. "
-        "The model utilizes Fibonacci-scaled filter counts (21, 34, 55, 89, 144, 233, 377) and Partial Connection "
-        "Blocks (PCB) for optimal feature extraction from medical ultrasound signals. Interpretability is "
-        "provided via Gradient-weighted Class Activation Mapping (Grad-CAM)."
+        "Analysis used FibonacciNet, a lightweight CNN with Fibonacci-scaled filter counts (21-377), two "
+        "parallel concatenation blocks with Avg-2Max pooling, and depthwise-separable convolutions in the tail. "
+        "The image is converted to grayscale, cropped to the ultrasound field and letterboxed to 224x224 without "
+        "distorting nodule shape. The output probability is recalibrated on validation data (Platt scaling), and the risk-band thresholds "
+        "were fixed on a validation split that shares no near-duplicate scans with the test split. "
+        "Grad-CAM highlights regions supporting the predicted class. Performance was measured on a single public "
+        "dataset without patient-level identifiers and has not been externally validated."
     )
     
     # 6. Disclaimer Header

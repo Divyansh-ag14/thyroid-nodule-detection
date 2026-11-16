@@ -1,191 +1,141 @@
 # ThyroCheck AI
 
-Clinical review workspace for thyroid ultrasound image assessment, Grad-CAM explainability, and DOCX report export.
+Thyroid nodule malignancy classification from B-mode ultrasound with **FibonacciNet**, a lightweight CNN, benchmarked against a conventional CNN on biopsy-confirmed data and an independent external dataset. Includes a FastAPI app with calibrated risk bands, Grad-CAM and DOCX reports.
 
-## What It Does
-
-ThyroCheck AI accepts a single thyroid ultrasound still image, runs model inference, generates a Grad-CAM attention map when available, and produces a structured report that can be downloaded as a `.docx` file.
-
-The current product surface is a FastAPI application with a custom HTML/CSS/JavaScript frontend.
-
-## Current Workflow
-
-1. Upload one PNG or JPEG ultrasound image.
-2. Run inference automatically after selection.
-3. Review the predicted class, confidence, original image, and attention map.
-4. Export the case as a DOCX report.
-
-## Highlights
-
-- FastAPI-based web app served at `/`
-- Custom clinical review UI in `frontend/`
-- TensorFlow model loading from Hugging Face Hub
-- Grad-CAM explainability for visual review support
-- DOCX report generation with prediction context and image outputs
-
-## Architecture Diagram
+> Research prototype. Not a medical device and not for clinical decision-making.
 
 <p align="center">
-  <img src="./architecture_diagram.png" alt="ThyroCheck AI architecture diagram" width="900">
+  <img src="docs/case-review.png" alt="Case review: risk band, calibrated probability, risk scale and Grad-CAM evidence map" width="49%">
+  <img src="docs/model-validation.png" alt="Model validation: FibonacciNet vs standard CNN accuracy and cost" width="49%">
 </p>
+<p align="center"><em>Left: case review on a held-out test image. Right: model validation page.</em></p>
 
-## Result Preview
+## Results
 
-<p align="center">
-  <img src="./result.png" alt="ThyroCheck AI result screen" width="900">
-</p>
+<p align="center"><img src="reports/figures/benchmark.png" alt="FibonacciNet vs standard CNN: AUROC and cost" width="900"></p>
 
-## Project Layout
+FibonacciNet reaches the same AUROC as a standard CNN with **16.6× fewer parameters, 3.1× fewer FLOPs and 2× faster CPU inference**.
+
+| | FibonacciNet | Standard CNN |
+|---|---|---|
+| AUROC, TN5000 test (929 images) | 0.894 ± 0.008 | 0.901 ± 0.011 |
+| AUROC, external test (3,095 images) | 0.763 ± 0.012 | 0.771 ± 0.014 |
+| Sensitivity / specificity at rule-out threshold | 88.9% / 72.8% | 90.0% / 73.8% |
+| Parameters | 0.38 M | 6.30 M |
+| FLOPs per image | 0.76 G | 2.40 G |
+| CPU latency per image | 4.2 ms | 8.5 ms |
+| Weights (float32) | 1.5 MB | 25.2 MB |
+
+Mean ± SD over 3 training seeds. ΔAUROC (FibonacciNet − CNN, seed-averaged):
+
+| Test set | ΔAUROC | 95% CI | DeLong p | Non-inferior (margin 0.03) |
+|---|---|---|---|---|
+| TN5000 | −0.002 | −0.016 to +0.011 | 0.77 | yes |
+| External | −0.002 | −0.011 to +0.008 | 0.73 | yes |
+
+### Clinical performance
+
+<p align="center"><img src="reports/figures/clinical.png" alt="ROC curves on both test sets and FibonacciNet calibration" width="900"></p>
+
+The two models' ROC curves overlap on both test sets. After Platt scaling, FibonacciNet's probabilities are well calibrated on the TN5000 test set (ECE 0.027). On the external set they are not, because its malignancy prevalence is 39% against 73% in TN5000, so a new site must recalibrate.
+
+FibonacciNet's output is reported in three risk bands. The cut-offs were fixed on the validation set; the figures below are from the TN5000 test set.
+
+| Band | Probability | What happens on the test set |
+|---|---|---|
+| Low suspicion | < 63% (rule-out: ≥90% sensitivity on validation) | 88.9% of cancers score above this band; 71.0% of nodules placed in it are benign |
+| Indeterminate | 63–83% | 14% of nodules; referred for specialist review |
+| High suspicion | ≥ 83% (rule-in: ≥90% specificity on validation) | 94.7% of nodules placed in it are malignant; 10.4% of benign nodules land here |
+
+Further findings:
+
+- **Small nodules.** Sensitivity at rule-out is about 76% for the smallest third of nodules, against about 92% for the rest.
+- **External set.** AUROC drops to about 0.77 for both models (domain shift), so the comparison between them is unaffected.
+- **Rejected change.** Adding BatchNorm to the pcb branches did not pass a validation criterion fixed in advance (`reports/pcbnorm_decision_rule.md`).
+
+Interactive results are on the app's `/benchmark` page. The full analysis is in `experiments/THYROID_NODULE_DETECTION.ipynb`.
+
+## Data
+
+| Role | Dataset | Details |
+|---|---|---|
+| Train / val / test | [TN5000](https://doi.org/10.6084/m9.figshare.28455641) (Zhang et al., *Scientific Data* 2025, CC BY) | 5,000 B-mode images, biopsy-confirmed labels, one nodule box per image. 3,610 / 461 / 929 after leakage removal |
+| External test | Kaggle `diveshzz/thyroid-cancer-classification-ultrasound-dataset` | 3,095 images, 39% malignant, label source undocumented. Never used for training, calibration, thresholds or model selection |
+
+**Leakage control.** Neither dataset has patient IDs. Every image is hashed with a difference hash and a DCT hash, and near-identical frames are grouped so that no group spans two splits.
+
+- **TN5000's published split leaks.** 42 official test images and 26 official validation images are near-exact copies of training images. These are moved into train, so val and test contain only unseen scans.
+- **The Kaggle set files 10 images under both labels.** The 20 conflicting images are excluded.
+- **No overlap between datasets.** The two datasets share no images.
+
+## Method
+
+- **Preprocessing** (`utils/processing.py`, shared by training and the app): grayscale conversion, inpainting of coloured scanner overlays, frame crop, and aspect-preserving letterbox to 224×224. Bright structures are not removed, so microcalcifications are preserved.
+- **Augmentation** (training only): horizontal flip, ±10° rotation, zoom, translation, gain/contrast/gamma, speckle noise and random erasing. There is no vertical flip, because depth is anatomically meaningful.
+- **Imbalance**: class-weighted binary cross-entropy. Nothing is resampled.
+- **Training**: AdamW with a cosine schedule (peak LR 2e-3), 40 epochs, keeping the epoch with the best validation AUROC. The recipe was selected on the Kaggle validation split (`reports/sweep.json`), so TN5000 received no tuning. Both models use the identical recipe.
+- **Models**:
+  - FibonacciNet: conv blocks of 21-34-55-89-144 filters, two parallel-concatenation branches with Avg-2Max pooling, and a depthwise-separable 233/377 tail.
+  - Standard CNN: the same depth with 32-512 filters, standard convolutions and max pooling.
+- **Evaluation**: AUROC with bootstrap CIs, paired DeLong test, non-inferiority test, Platt calibration, and sensitivity/specificity at fixed operating points. Calibration and thresholds are fitted on validation, then frozen for both test sets.
+- **Operating points**:
+  - Rule-out: ≥90% sensitivity on validation. Below it, a case is low suspicion.
+  - Rule-in: ≥90% specificity on validation. Above it, a case is high suspicion.
+  - Between the two, a case is indeterminate.
+
+## Reproduce
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+./training/run_benchmark.sh   # splits, 2 models x 3 seeds, evaluation (~5 h on an Apple M4 CPU)
+python -m training.figures    # README figures
+```
+
+TN5000: download `TN5000_forReview.zip` from the [figshare record](https://doi.org/10.6084/m9.figshare.28455641) and unzip it to `~/.cache/tn5000/raw/`, or set `TN5000_DATA`. The Kaggle set is fetched with `kagglehub`, or set `THYROID_DATA`.
+
+Outputs:
+
+| Path | Contents |
+|---|---|
+| `reports/benchmark.json` | All metrics |
+| `reports/runs/` | Per-epoch histories and per-image predictions for every run |
+| `reports/logs/` | Training logs |
+| `models/` | Deployed FibonacciNet and its calibration |
+
+Each run records its git commit, data-split hash and environment.
+
+## App
+
+```bash
+uvicorn app:app --port 8000
+```
+
+- `/`: upload an ultrasound image, or choose one of four built-in TN5000 test cases. Returns the calibrated malignancy probability, risk band, Grad-CAM evidence map and a DOCX report.
+- `/benchmark`: model validation results.
+- API: `POST /analyze`, `POST /report`, `GET /api/benchmark`, `GET /api/model`.
+
+## Project layout
 
 ```text
-thyroid-nodule-detection/
-|-- app.py
-|-- README.md
-|-- requirements.txt
-|-- backend/
-|   `-- routes.py
-|-- frontend/
-|   |-- static/
-|   |   |-- app.js
-|   |   `-- style.css
-|   `-- templates/
-|       `-- index.html
-|-- utils/
-|   |-- config.py
-|   |-- gradcam.py
-|   |-- logger.py
-|   |-- model_architecture.py
-|   |-- processing.py
-|   `-- report_generator.py
-|-- model artifacts/
-|-- test files/
-|-- experiments/
-|-- RESEARCH/
-|-- NOTES/
-`-- logs/
+app.py                 FastAPI entry point
+backend/routes.py      inference, calibration, risk bands, endpoints
+training/              dataset audit + splits, augmentation, training, evaluation, figures
+utils/                 model architectures, preprocessing, Grad-CAM, DOCX report
+frontend/              case review and model validation pages
+reports/               benchmark results, run histories, logs, figures
+models/                deployed model + calibration
+experiments/           analysis notebook
 ```
 
-## Tech Stack
+## Limitations
 
-- FastAPI
-- Uvicorn
-- TensorFlow
-- Hugging Face Hub
-- NumPy
-- Pillow
-- OpenCV
-- Matplotlib
-- python-docx
-- Jinja2
+- **Patient overlap.** With no patient IDs, separate views of the same patient may still fall in different splits.
+- **External labels.** The external dataset's labels are not biopsy-confirmed, so it measures transfer to a different source rather than accuracy.
+- **Single-image input.** The model classifies one whole frame with no Doppler, cine or TI-RADS inputs. It assumes a nodule is present and does not detect one.
+- **Attention.** Grad-CAM peaks fall inside the annotated nodule box in 23% of test images, so the model also uses surrounding context.
 
-## Requirements
+## References
 
-- Python 3
-- `pip`
-
-Install project dependencies with:
-
-```bash
-pip install -r requirements.txt
-```
-
-## Getting Started
-
-### Option 1: Use the existing local environment
-
-If you already have the repo-specific environment:
-
-```bash
-source mac_env/bin/activate
-python app.py
-```
-
-### Option 2: Create a fresh virtual environment
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
-```
-
-Then open:
-
-```text
-http://127.0.0.1:8000
-```
-
-## First Run Notes
-
-- The model is loaded from Hugging Face on startup.
-- First launch can take longer because the model may need to download and TensorFlow/Matplotlib may build local caches.
-- If the Hugging Face repository requires authentication, authenticate before launch.
-
-## Configuration
-
-Model source is configured in [`utils/config.py`](utils/config.py):
-
-- `REPO_ID = "Diveshj/thyroid_models"`
-- `MODEL_FILENAME = "thyroid_cancer_model.keras"`
-
-## API Surface
-
-### `GET /`
-
-Serves the main review interface.
-
-### `POST /analyze`
-
-Accepts an uploaded image and returns:
-
-- prediction label
-- raw score
-- confidence percentage
-- malignancy flag
-- original image as base64
-- Grad-CAM image as base64 when available
-
-### `POST /report`
-
-Accepts an uploaded image, reruns inference, and returns a downloadable DOCX report.
-
-## Frontend Notes
-
-The UI is built from:
-
-- [`frontend/templates/index.html`](frontend/templates/index.html)
-- [`frontend/static/style.css`](frontend/static/style.css)
-- [`frontend/static/app.js`](frontend/static/app.js)
-
-The frontend is designed around a progressive workflow:
-
-- intake first
-- preview after upload
-- results after analysis
-- report export after review
-
-## Logs and Artifacts
-
-- Runtime logs are written to `logs/app.log`
-- Sample files for testing live in `test files/`
-- Research and notes remain in `RESEARCH/` and `NOTES/`
-
-## Operational Notes
-
-- This project currently focuses on single-image review, not batch processing.
-- Supported upload formats in the app are PNG and JPEG images.
-- Grad-CAM may not be available for every run if heatmap generation fails, but inference and report generation can still complete.
-
-## Quick Troubleshooting
-
-### The server looks "stuck"
-
-That usually means the FastAPI server is running and holding the terminal open. Open `http://127.0.0.1:8000` in a browser.
-
-### The first run is slow
-
-This is expected if the model is downloading or local font/model caches are being created.
-
-### The report button does nothing
-
-Run an analysis first. Report export is only available after a completed case review.
+- Fibonacci-Net: lightweight CNN with Fibonacci-scaled filters and Avg-2Max pooling, originally for brain MRI (`RESEARCH/fibonnaci.pdf`).
+- H. Zhang, Q. Liu, X. Han, L. Niu, W. Sun. *TN5000: An Ultrasound Image Dataset for Thyroid Nodule Detection and Classification.* Scientific Data, 2025. doi:10.6084/m9.figshare.28455641.

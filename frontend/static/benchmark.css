@@ -1,0 +1,362 @@
+:root {
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --grid: rgba(23, 39, 48, 0.08);
+    --axis: rgba(23, 39, 48, 0.28);
+    --track: rgba(23, 39, 48, 0.06);
+}
+
+body {
+    background: var(--bg);
+}
+
+.is-hidden {
+    display: none !important;
+}
+
+.bench {
+    display: grid;
+    gap: 18px;
+    margin-top: 14px;
+}
+
+.bench-card,
+.hero {
+    background: var(--surface-strong);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-sm);
+    padding: 22px 24px;
+    min-width: 0;
+}
+
+.bench-card h3 {
+    margin: 4px 0 6px;
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+}
+
+.card-sub {
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 14px;
+}
+
+.bench-muted {
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-top: 14px;
+}
+
+.card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- hero */
+.hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 28px;
+    align-items: center;
+    padding: 28px;
+}
+
+.hero h2 {
+    font-size: clamp(1.5rem, 2.8vw, 2.25rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 6px 0 12px;
+}
+
+.hero-lede {
+    color: var(--ink-soft);
+    line-height: 1.6;
+}
+
+.verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.verdict.bad {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.verdict::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.ratio-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.ratio {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    background: #fff;
+}
+
+.ratio strong {
+    display: block;
+    font-size: 2rem;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+}
+
+.ratio span {
+    display: block;
+    margin-top: 6px;
+    font-weight: 700;
+}
+
+.ratio small {
+    display: block;
+    margin-top: 4px;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- paired bars */
+.pair-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+}
+
+.swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    margin-right: 6px;
+    vertical-align: baseline;
+}
+
+.bars {
+    display: grid;
+    gap: 16px;
+}
+
+.metric-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    margin-bottom: 6px;
+}
+
+.metric-label small {
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+.bar-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.bar-track {
+    height: 12px;
+    border-radius: 4px;
+    background: var(--track);
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    min-width: 3px;
+}
+
+.bar-value {
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- triage */
+.triage {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.band {
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-top: 4px solid var(--band);
+}
+
+.band.low { --band: var(--success); }
+.band.mid { --band: var(--warn); }
+.band.high { --band: var(--danger); }
+
+.band h4 {
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.band .band-rule {
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    margin-bottom: 12px;
+}
+
+.band .band-stat {
+    font-size: 1.6rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+.band p {
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+}
+
+.band p + .band-stat {
+    margin-top: 10px;
+}
+
+/* ---------------------------------------------------------------- charts */
+.segmented {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--track);
+}
+
+.segmented button {
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+
+.segmented button[aria-selected="true"] {
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(23, 39, 48, 0.12);
+}
+
+.chart svg {
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+    display: block;
+    overflow: visible;
+}
+
+.chart text {
+    font-size: 11px;
+    fill: var(--ink-soft);
+}
+
+.chart .axis-title {
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.chart .direct-label {
+    fill: var(--ink);
+    font-weight: 700;
+}
+
+.chart-tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--surface-dark);
+    color: #fff;
+    font-size: 0.8rem;
+    padding: 7px 10px;
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity 120ms;
+    z-index: 50;
+    max-width: 260px;
+    line-height: 1.4;
+}
+
+.fact-list {
+    display: grid;
+    gap: 9px;
+    padding-left: 18px;
+    line-height: 1.5;
+    font-size: 0.92rem;
+}
+
+.fact-list strong {
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+    .hero,
+    .pair-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .triage {
+        grid-template-columns: 1fr;
+    }
+
+    .hero {
+        padding: 20px;
+    }
+
+    .bench-card {
+        padding: 18px;
+    }
+
+    .ratio strong {
+        font-size: 1.6rem;
+    }
+}

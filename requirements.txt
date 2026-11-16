@@ -9,3 +9,13 @@ fastapi
 uvicorn
 python-multipart
 jinja2
+
+# training / evaluation
+scikit-learn
+scipy
+pandas
+kagglehub
+
+# notebook
+ipykernel
+nbclient

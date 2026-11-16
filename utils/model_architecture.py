@@ -59,8 +59,31 @@ class DepthwiseSeparableConv(layers.Layer):
 
 
 
+# Name of the last spatial feature layer in every model we build; Grad-CAM targets it.
+GRADCAM_LAYER = "gradcam_target"
+
+
+def _pcb_normalized(x):
+    """
+    Parallel concatenation block (conv -> Avg-2Max -> conv -> Avg-2Max) with BatchNorm on its output:
+    Avg-2Max returns large, mostly negative values that are otherwise concatenated unscaled with the
+    BN+ReLU main-path features.
+    """
+    x = layers.Conv2D(24, 3, padding='same')(x)
+    x = Avg2MaxPooling()(x)
+    x = layers.Conv2D(24, 3, padding='same')(x)
+    x = Avg2MaxPooling()(x)
+    return layers.BatchNormalization()(x)
+
+
 # -------- FibonacciNet (Notebook4e) --------
-def create_fibonacci_net(input_shape=(224, 224, 3), num_classes=1):
+def create_fibonacci_net(input_shape=(224, 224, 3), num_classes=1, pcb_norm=False):
+    """
+    FibonacciNet. `pcb_norm=True` adds BatchNorm at the end of each pcb branch
+    (improvement candidate evaluated and rejected; see reports/pcbnorm_decision_rule.md).
+    """
+    if pcb_norm:
+        return _create_fibonacci_pcbnorm(input_shape, num_classes)
     inputs = layers.Input(shape=input_shape)
 
     # Block Architecture Starts
@@ -121,10 +144,65 @@ def create_fibonacci_net(input_shape=(224, 224, 3), num_classes=1):
     x = DepthwiseSeparableConv(233)(x)  # 7x7x233
 
     # --- Block 7 (377 filters, DWSC) ---
-    x = DepthwiseSeparableConv(377)(x)  # 7x7x377
+    x = DepthwiseSeparableConv(377, name=GRADCAM_LAYER)(x)  # 7x7x377
 
     # --- Output ---
     x = layers.GlobalAveragePooling2D()(x)
     outputs = layers.Dense(num_classes, activation='sigmoid')(x)
 
-    return Model(inputs, outputs)
+    return Model(inputs, outputs, name="fibonacci_net")
+
+
+def _conv_block(x, filters):
+    x = layers.Conv2D(filters, 3, padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    return layers.ReLU()(x)
+
+
+def _create_fibonacci_pcbnorm(input_shape, num_classes):
+    """Same network as create_fibonacci_net with BatchNorm at the end of both pcb branches."""
+    inputs = layers.Input(shape=input_shape)
+    x = layers.MaxPooling2D(2)(_conv_block(inputs, 21))
+    x2 = _conv_block(x, 34)
+    x = layers.MaxPooling2D(2)(x2)
+    x3 = _conv_block(x, 55)
+    x = layers.MaxPooling2D(2)(x3)
+
+    x = layers.MaxPooling2D(2)(_conv_block(x, 89))
+    x = layers.concatenate([x, layers.Resizing(14, 14)(_pcb_normalized(x2))])
+    x = layers.MaxPooling2D(2)(_conv_block(x, 144))
+    x = layers.concatenate([x, layers.Resizing(7, 7)(_pcb_normalized(x3))])
+
+    x = DepthwiseSeparableConv(233)(x)
+    x = DepthwiseSeparableConv(377, name=GRADCAM_LAYER)(x)
+    x = layers.GlobalAveragePooling2D()(x)
+    outputs = layers.Dense(num_classes, activation='sigmoid')(x)
+    return Model(inputs, outputs, name="fibonacci_net_pcbnorm")
+
+
+def create_baseline_cnn(input_shape=(224, 224, 3), num_classes=1):
+    """
+    Conventional VGG-style CNN used as the benchmark: same depth (5 pooled conv
+    blocks + 2 tail convs), power-of-two widths, plain max pooling, standard 3x3
+    convolutions in the tail and no parallel branches.
+    """
+    inputs = layers.Input(shape=input_shape)
+    x = inputs
+    for filters in (32, 64, 128, 256, 512):
+        x = layers.MaxPooling2D(2)(_conv_block(x, filters))
+    x = _conv_block(x, 512)
+    x = layers.Conv2D(512, 3, padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU(name=GRADCAM_LAYER)(x)
+    x = layers.GlobalAveragePooling2D()(x)
+    outputs = layers.Dense(num_classes, activation='sigmoid')(x)
+    return Model(inputs, outputs, name="baseline_cnn")
+
+
+MODEL_BUILDERS = {
+    "fibonacci_net": create_fibonacci_net,
+    "baseline_cnn": create_baseline_cnn,
+    "fibonacci_net_pcbnorm": lambda **kw: create_fibonacci_net(pcb_norm=True, **kw),
+}
+
+CUSTOM_OBJECTS = {"Avg2MaxPooling": Avg2MaxPooling, "DepthwiseSeparableConv": DepthwiseSeparableConv}
